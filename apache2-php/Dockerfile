@@ -25,3 +25,7 @@ COPY ./etc/apache2/.htpasswd /etc/apache2/.htpasswd
 
 # Habilitar los virtual hosts
 RUN a2ensite intranet.conf
+
+COPY ./certs /etc/apache2/ssl
+
+RUN a2enmod ssl

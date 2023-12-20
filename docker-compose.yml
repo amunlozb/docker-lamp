@@ -23,7 +23,7 @@ services:
         build: ./apache2-php
         container_name: daweb-docker-lamp-apache2
         ports: 
-            - "80:80"
+            - "8081:80"
             - "8060:8060"
         volumes:
             # Volumen para que los archivos de configuración de los sitios web publicado sean copiados del disco local a su ubicación correcta dentro del contenedor

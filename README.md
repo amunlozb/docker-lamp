@@ -1,248 +1,341 @@
-# daweb-docker-lamp
-Proyecto para la instalación de LAMP a través de contenedores Docker
+# Configuración de la Pila LAMP en Docker
 
+## Índice
+
+- [Configuración de la Pila LAMP en Docker](#configuración-de-la-pila-lamp-en-docker)
+  - [Índice](#índice)
+  - [Requisitos Previos](#requisitos-previos)
+  - [Estructura del proyecto](#estructura-del-proyecto)
+  - [Configuración de Virtual Host](#configuración-de-virtual-host)
+    - [1. Cambio de nombres](#1-cambio-de-nombres)
+      - [1.1. Editar al archivo de hosts](#11-editar-al-archivo-de-hosts)
+      - [1.2. Entrar en la configuración de Apache](#12-entrar-en-la-configuración-de-apache)
+      - [1.3. Cambiar la configuración](#13-cambiar-la-configuración)
+        - [angel-munoz-www.local](#angel-munoz-wwwlocal)
+        - [angel-munoz-intranet.local](#angel-munoz-intranetlocal)
+      - [1.4. Reiniciar Docker-Compose](#14-reiniciar-docker-compose)
+    - [2. Crear Virtual Host para PhpMyAdmin](#2-crear-virtual-host-para-phpmyadmin)
+    - [3. Cambiar index.html (Intranet)](#3-cambiar-indexhtml-intranet)
+    - [4. Crear usuario nuevo (Intranet)](#4-crear-usuario-nuevo-intranet)
+    - [5. Instalar Wordpress CMS](#5-instalar-wordpress-cms)
+  - [Instalación de Certificados SSL](#instalación-de-certificados-ssl)
+    - [1. Generar certificados](#1-generar-certificados)
+      - [1.1 Crear Directorio](#11-crear-directorio)
+      - [1.2 Generar Certificados](#12-generar-certificados)
+        - [HTTPS](#https)
+    - [2. Configurar protocolo HTTPS](#2-configurar-protocolo-https)
+    - [3. Activar mod\_ssl](#3-activar-mod_ssl)
+
+## Requisitos Previos
+
+Partimos de la base de un servidor web Apache desplegado.
+El tutorial para hacerlo se encuentra en el archivo `readme.md` dentro de [este repositorio](https://github.com/antonio-gabriel-gonzalez-casado/docker-lamp/)
+
+
+
+## Estructura del proyecto
+La estructura tomará la siguiente forma:
 ```
-docker-lamp
-├─ .gitignore 
-├─ LICENSE
-├─ README.md
-├─ apache2-php
-│  ├─ Dockerfile
-│  ├─ conf
-│  │  ├─ 000-default.conf
-│  │  └─ intranet.conf
-│  ├─ etc
-│  │  ├─ apache2
-│  └─ www
-│     ├─ index.html
-│     ├─ intranet
-│     │  └─ index.html
-│     ├─ phpinfo.php
-│     └─ test-bd.php
-├─ dist
-│  ├─ env.dist
-│  └─ htpasswd.dist
-├─ docker-compose.yml
-├─ docs
-│  └─ images
-└─ mysql
-   ├─ conf
-   └─ dump
-      └─ myDb.sql
-
-```
-
-La estructura del proyecto `docker-lamp` es un entorno de desarrollo LAMP (Linux, Apache, MySQL, PHP) utilizando Docker. A continuación, se describen cada parte de la estructura:
-
-- **.gitignore**: Este archivo indica a Git qué archivos o carpetas ignorar en el control de versiones, como archivos de configuración personales o directorios de compilación. En este caso ignoraremos el archivo con las variables de entorno .env
-
-- **LICENSE**: Contiene información sobre la licencia bajo la cual se distribuye el proyecto, especificando cómo se puede usar o modificar.
-
-- **README.md**: Incluye información sobre el proyecto, como descripciones, instrucciones de instalación, uso y créditos.
-
-- **apache2-php/**: Esta carpeta contiene los archivos relacionados con el servidor web Apache y PHP.
-  - **Dockerfile**: Script de instrucciones para construir la imagen Docker para el servidor Apache con PHP.
-  - **conf/**: Contiene archivos de configuración para Apache.
-    - **000-default.conf**: La configuración predeterminada del Virtual Host para Apache.
-    - **intranet.conf**: La configuración del Virtual Host para la intranet, accesible en un puerto específico o subdominio.
-  - **etc/apache2/**: Contiene archivos de configuración adicionales para el directorio apache2.
-  - **www/**: Directorio que almacena los archivos del sitio web.
-    - **index.html**: Página de inicio para el sitio principal.
-    - **intranet/**: Carpeta que contiene los archivos para la sección de intranet del sitio.
-      - **index.html**: Página de inicio para la intranet.
-    - **phpinfo.php**: Script PHP para mostrar información sobre la configuración de PHP.
-    - **test-bd.php**: Script PHP para probar la conexión a la base de datos MySQL.
-
-- **dist/**: Contiene plantillas o archivos distribuibles, en este caso una versión de ejemplo del archivo `.env`.
-  - **env.dist**: Una plantilla para el archivo de variables de entorno.
-  - **htpasswd.dist**: Una plantilla para con usuario de ejemplo inicial para acceder a la intranet
-
-- **docker-compose.yml**: Archivo YAML que define los servicios, redes y volúmenes para el proyecto, organizando y ejecutando múltiples contenedores Docker.
-
-- **docs/**: Directorio destinado a contener documentación del proyecto.
-  - **images/**: Imágenes utilizadas en la documentación.
-
-- **mysql/**: Contiene configuraciones y datos relacionados con el servicio de base de datos MySQL.
-  - **conf/**: Directorio para archivos de configuración personalizados de MySQL.
-  - **dump/**: Contiene archivos de carga de bases de datos, como scripts SQL para inicializar la base de datos.
-    - **myDb.sql**: Un script SQL con lo necesario para inicializar la base de datos.
-
-# Guía de Instalación del Proyecto Docker LAMP
-
-Esta guía detalla los pasos para clonar y configurar un entorno Docker LAMP (Linux, Apache, MySQL, PHP) con Virtual Hosts.
-
-## Clonar el Repositorio
-
-Primero, clonar el repositorio Git:
-
-```bash
-git clone [URL_DEL_REPOSITORIO]
-cd docker-lamp
+-- .gitignore
+|-- LICENSE
+|-- README.md
+|-- apache2-php
+| |-- certs
+| | |-- intranet.crt
+| | |-- intranet.key
+| | |-- phpmyadmin.crt
+| | |-- phpmyadmin.key
+| | |-- www.crt
+| | └-- www.key
+| |-- Dockerfile
+| |-- conf
+| | |-- 000-default.conf
+| | |-- intranet.conf
+| | └-- angel-munoz-phpmyadmin.conf
+| |-- etc
+| | └-- apache2
+| | └-- .htpasswd
+| └-- www
+| |-- index.html
+| |-- intranet
+| | └-- index.html
+| |-- phpinfo.php
+| |-- test-bd.php
+| └-- wordpress
+| └-- carpetas del entorno...
+|-- dist
+| |-- env.dist
+| └-- htpasswd.dist
+|-- docker-compose.yml
+|-- docs
+| └-- images
+└-- mysql
+|-- conf
+└-- dump
+└-- myDb.sql
 ```
 
-##  Configurar Archivo .env
+## Configuración de Virtual Host
 
-Copiar el archivo env.dist a .env y personaliza las variables de entorno:
+### 1. Cambio de nombres
 
-```bash
-cp dist/env.dist .env
-```
+Cambia los nombres del virtual host a los requeridos por el ejercicio:
 
-Editar el archivo .env estableciendo los siguientes valores:
+- `www.local` pasa a ser `angel-munoz-www.local`
+- `intranet.local` pasa a ser `angel-munoz-intranet.local`
 
-```
-MYSQL_DATABASE=dbname
-MYSQL_USER=root
-MYSQL_PASSWORD=test
-MYSQL_ROOT_PASSWORD=test
-MYSQL_PORT=3307
-```
+#### 1.1. Editar al archivo de hosts
 
-Copiar el archivo htpasswd.dist a ./apache2-php/etc/apache2/ y añade usuarios para acceder a la intranet:
+Ubicación del archivo:
 
-```bash
-cp dist/htpasswd.dist ./apache2-php/etc/apache2/.htpasswd
-```
+- **Windows:** C:\Windows\System32\drivers\etc\hosts
+- **Linux/Mac:** /etc/hosts
 
-Los usuarios tiene el formato:
-```
-usuario:contraseña
-```
-La constraseña se puede generar con la utilidad de apache2-utils o directamente usando un [generador online](https://hellotools.org/es/generar-cifrar-contrasena-para-archivo-htpasswd)
-
-## Construir las Imágenes
-
-Construir las imágenes usando Docker Compose:
-
-```bash
-docker-compose build
-```
-
-## Iniciar los Contenedores
-
-Arrancar los contenedores en modo detached:
-
-```bash
-docker-compose up -d
-```
-
-## Comprobaciones de Prueba
-
-### Creación de un usuario adicional para acceder a la intranet:
-Para acceder a al intranet se necesita crear un archivo .htpasswd con los nombres de usuario y sus contraseñas. Se puede usar la herramienta htpasswd para esto. Para ello accede al contenedor daweb-docker-lamp-apache2 a través del terminal mediante el siguiente comando:
+Agrega las siguientes lineas:
 
 ```
-docker exec -it daweb-docker-lamp-apache2
+127.0.0.1    angel-munoz-www.local
+127.0.0.1    angel-munoz-intranet.local
 ```
 
-Lanzar el comando que crea un usuario llamado usuario2 y pedirá que se introduzca una contraseña:
+![1](screenshots/1.png)
+
+#### 1.2. Entrar en la configuración de Apache
+
+Ubicación del archivo:
+
+- **apache2-php/conf/000-default.conf:** aqui estará `angel-munoz-www.local`
+- **apache2-php/conf/intranet.conf:** aqui estará `angel-munoz-intranet.local`
+
+![2](screenshots/2.png)
+
+#### 1.3. Cambiar la configuración
+
+Cambia los `ServerName` para que contengan los nombres actualizados
+
+##### angel-munoz-www.local
+
 ```
-htpasswd /etc/apache2/.htpasswd usuario2
+<VirtualHost *:80>
+    ServerName angel-munoz-www.local
+    DocumentRoot /var/www/html
+
+    <Directory /var/www/html>
+        AllowOverride All
+        Require all granted
+    </Directory>
+</VirtualHost>
+```
+##### angel-munoz-intranet.local
+```
+Listen 8060
+
+<VirtualHost *:8060>
+    ServerName angel-munoz-intranet.local
+    DocumentRoot /var/www/html/intranet
+
+    <Directory /var/www/html/intranet>
+        Options Indexes FollowSymLinks
+        AllowOverride All
+
+        AuthType Basic
+        AuthName "Area Restringida"
+        AuthUserFile /etc/apache2/.htpasswd
+        Require valid-user
+    </Directory>
+</VirtualHost>
 ```
 
-### Prueba de los servicios:
-Para probar si los servicios están funcionando correctamente, acceder a los siguientes enlaces a través del navegador:
+#### 1.4. Reiniciar Docker-Compose
 
-- **Prueba del sitio principal**: [http://localhost](http://localhost)
-- **Prueba de la intranet**: [http://localhost:8060 (usando usuario1 y contraseña:123456789 o el usuario creado en el paso anterior)](http://localhost:8060)
-- **Prueba de PHP Info**: [http://localhost/phpinfo.php](http://localhost/phpinfo.php)
-- **Prueba de Conexión a la Base de Datos**: [http://localhost/test-bd.php](http://localhost/test-bd.php)
-- **Prueba de phpmyadmin**: [http://localhost:8080 (con el usuario root y la contraseña establecida)](http://localhost:8080)
+Reinicia docker-compose para guardar los cambios:
 
-
-## Detener los Contenedores
-Para detener y eliminar los contenedores:
-
-```bash
-docker-compose down
+```
+docker-compose restart
 ```
 
-## (Opcional) Configuración
-Para acceder a las urls configuradas en los virtual host:
-- **Sitio Principal**: [http://www.local](http://www.local)
-- **Intranet**: [http://intranet.local:8060 (usando usuario1 y contraseña:123456789 o el usuario creado en el paso anterior)](http://intranet.local:8060)
-- **PHP Info**: [http://www.local/phpinfo.php](http://www.local/phpinfo.php)
-- **Conexión a la Base de Datos**: [http://www.local/test-bd.php](http://www.localtest-bd.php)
-- **Phpmyadmin**: [http://www.local:8080 (con el usuario root y la contraseña establecida)](http://www.local:8080)
+Vamos a comprobar que todo funciona entrando a la URL:
 
-Hay que modificar el fichero **/etc/hosts** del sistema operativo anfitrión (no el contenedor de docker) y añadir las siguientes líneas:
+http://angel-munoz-www.local
+
+![3](screenshots/3.png)
+
+### 2. Crear Virtual Host para PhpMyAdmin
+
+Creamos un archivo de configuración que se llame angel-munoz-phpmyadmin.local:8081.
+
 ```
-127.0.0.1	www.local
-127.0.0.1	intranet.local
+Listen 8081
+
+<VirtualHost *:8081>
+    ServerName angel-munoz-phpmyadmin.local
+
+    <Location />
+        Options Indexes FollowSymLinks
+        AllowOverride All
+
+        AuthType Basic
+        AuthName "Area Restringida"
+        AuthUserFile /etc/apache2/.htpasswd
+        Require valid-user
+    </Location>
+
+    ProxyPreserveHost On
+    ProxyPass / http://phpmyadmin:80/
+    ProxyPassReverse / http://phpmyadmin:80/
+</VirtualHost>
 ```
+
+Esto hace que angel-munoz-phpmyadmin.local te redirija a la página de phpMyAdmin
+
+### 3. Cambiar index.html (Intranet)
+
+Ubicación:
+
+[apache2-php/www/intranet/index.html](apache2-php/www/intranet/index.html)
+
+![3.5](screenshots/3.5.png)
+
+### 4. Crear usuario nuevo (Intranet)
+
+Ubicación:
+
+[apache2-php/etc/apache2/.htpasswd](apache2-php/etc/apache2/.htpasswd)
+
+Crea un usuario nuevo con el formato `nombre-apellidos`  
+Para cifrar la contraseña, usa la página [wtools.io](https://wtools.io/generate-htpasswd-online)
+
+
+Resultado de usuario con contraseña cifrada:
+
+`Angel:$apr1$7fqkhaju$8AjgJGX1QhpNxFBvXoFeZ1`
+
+![4](screenshots/4.png)
+
+### 5. Instalar Wordpress CMS
+Lo primero es acceder al menú de phpMyAdmin utilizando el usuario y contraseña configurados. Al hacerlo entraremos en una ventana similar a la siguiente. El primer paso será ir a la sección para ver todas las bases de datos, se encuentra en el header superior.
+
+Entra al menu de phpMyAdmin, y navega hasta las bases de datos.
+
+![5](screenshots/5.png)
+
+Crea una base de datos llamada WordPress
+
+
+Entra al menu y crea una nueva Cuenta de Usuario.
+nombre: `wordPress`
+Activamos todos los permisos para esta cuenta (checkbox).
+
+![6](screenshots/6.png)
+![6.5](screenshots/6.5.png)
+
+Ahora, descarga [WordPress](https://es.wordpress.org/download/)
+
+Guarda la carpeta en `apache2-php/www`.  
+Resultado:  
+
+![7](screenshots/7.png)
+
+Dentro de esta carpeta hay que modificar el archivo ```wp-config.php``` y asignarles los valores de nuestra base de datos creada en phpMyAdmin en este archivo de configuración; nombre de la base de datos, usuario, contraseña y el host. Este último se puede encontrar en la parte superior de phpMyAdmin.
+
+Cambia `wp-config.php`, aplicando los datos de nuestra base de datos:  
+`nombre`, `usuario`, `contraseña`, `host`. 
+Para encontrar el host, entra en phpMyAdmin y localizado en la parte de arriba.
+
+Tras todo esto, reinicia docker-compose 
+```docker-compose restart```
+
+Instala Wordpress en esta URL:  
+http://example.com/wp-admin/install.php
+
+Para acceder a la instalación de WordPress, asegúrate de agregar la ruta `/wordpress` antes de `/wp-admin`
+La URL completa para la instalación sería:
+
+[http://angel-munoz-intranet.local/wordpress/wp-admin/install.php](http://angel-munoz-intranet.local/wordpress/wp-admin/install.php)
+
+![8](screenshots/8.png)
+![8.5](screenshots/8.5.png)
+
+Configura el `título`, `usuario` y `contraseña`, y luego confirma la instalación de Wordpress.
+
+![9](screenshots/9.png)
+
+A continuación, realiza el login con los datos introducidos:
+
+![10](screenshots/10.png)
+![11](screenshots/11.png)
+![12](screenshots/12.png)
+
 ## Instalación de Certificados SSL
 
-### Generación de Certificados
+### 1. Generar certificados
 
-Crear un directorio llamado certs en el directorio raiz del proyecto para almacenar los certificados.
+#### 1.1 Crear Directorio
 
-Se puede usar el comando:
+Crea una carpeta en `apache2-php`. Luego sitúate en ella a traves de comandos.
+Llama a la carpeta `certs`
 
-```bash
-mkdir certs
-cd certs
+![13](screenshots/13.png)
+
+#### 1.2 Generar Certificados
+
+Primero, genera el certificado local:
 ```
-
-Lanzar el comando de generación de certificados de openssl:
-
-```bash
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout www.key -out www.crt
+```
+![14](screenshots/14.png)
+Luego, genera el certificado de intranet:
+```
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout intranet.key -out intranet.crt
 ```
 
-Este comando crea un certificado (crt) y una clave privada (key) válidos por 365 días.
-- x509: Especifica que quieres generar un certificado autofirmado.
-- nodes: Crea una clave sin contraseña.
-- days 365: El certificado será válido por 365 días.
-- newkey rsa:2048: Crea una nueva clave de 2048 bits.
-- keyout: El nombre del archivo para la clave privada (normalmente será el nombre del dominio)
-- out: El nombre del archivo para el certificado (normalmente será el nombre del dominio)
-
-Durante el proceso, se piden detalles como país, estado, organización, etc. 
-
-Para Common Name (Introducir el nombre del dominio www.local, intranet.local).
+Para el campo `Common Name`, usa los dominios (en este caso, www.local, intranet.local)
 
 
-### Configurar Virtual Host 443
+##### HTTPS
 
-En cada archivo de configuración agregar una regla como esta replicando la configuración adicional de la ya existente:
+Genera el certificado HTTPS para el virtual host de phpMyAdmin (`angel-munoz-phpmyadmin.local`) a traves del siguiente comando:
 
 ```
-<VirtualHost *:443>
-    ServerName www.local
-    SSLEngine on
-    SSLCertificateFile /etc/apache2/ssl/www.crt
-    SSLCertificateKeyFile /etc/apache2/ssl/www.key
-</VirtualHost>
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout phpmyadmin.key -out phpmyadmin.crt
+```
+![15](screenshots/15.png)
 
-<VirtualHost *:443>
-    ServerName intranet.local
-    SSLEngine on
-    SSLCertificateFile /etc/apache2/ssl/intranet.crt
-    SSLCertificateKeyFile /etc/apache2/ssl/intranet.key
-</VirtualHost>
+### 2. Configurar protocolo HTTPS
+Agrega una regla nueva para cada archivo config, tras la etiqueta `Directory`
+
+[**Para angel-munoz-www.local**](apache2-php/conf/000-default.conf)
+```
+SSLEngine on
+SSLCertificateFile /etc/apache2/ssl/www.crt
+SSLCertificateKeyFile /etc/apache2/ssl/www.key
 ```
 
-### Habilitar el módulo mod_ssl
-
-En el Dockerfile de apache2-php se deben copiar los certificados generados, para ello añade la siguiente línea:
-
+[**Para angel-munoz-intranet.local**](apache2-php/conf/intranet.conf)
 ```
-# Copiar archivos de contraseñas
+SSLEngine on
+SSLCertificateFile /etc/apache2/ssl/intranet.crt
+SSLCertificateKeyFile /etc/apache2/ssl/intranet.key
+```
+
+[**Para angel-munoz-phpmyadmin.local**](apache2-php/conf/angel-munoz-phpmyadmin.conf)
+```
+SSLEngine on
+SSLCertificateFile /etc/apache2/ssl/phpmyadmin.crt
+SSLCertificateKeyFile /etc/apache2/ssl/phpmyadmin.key
+```
+![15.5](screenshots/15.5.png)
+
+### 3. Activar mod_ssl
+Agrega esto al Dockerfile:
+```
 COPY ./certs /etc/apache2/ssl
-```
 
-Además se debe habilitar el módulo ssl, para ello agregar la siguiente línea:
-
-```
 RUN a2enmod ssl
 ```
 
+Así quedaría finalmente el dockefile (y el directorio `certs` a la izquierda):
 
-## (Opcional) Configuración
-Para acceder a las urls configuradas en los virtual host:
-- **Sitio Principal**: [https://www.local](https://www.local)
-- **Intranet**: [https://intranet.local (usando usuario1 y contraseña:123456789 o el usuario creado en el paso anterior)](https://intranet.local)
-- **PHP Info**: [https://www.local/phpinfo.php](https://www.local/phpinfo.php)
-- **Conexión a la Base de Datos**: [https://www.local/test-bd.php](https://www.localtest-bd.php)
+![16](screenshots/16.png)
 
+Con esto, el proyecto queda completamente finalizado.
